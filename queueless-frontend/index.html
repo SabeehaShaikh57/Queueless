@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Queueless — Skip the Wait</title>
+<meta name="description" content="Queueless — Virtual queue management for clinics, salons, banks and more. Join queues remotely and get real-time turn notifications."/>
+<meta name="author" content="Queueless"/>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Familjen+Grotesk:wght@400;600;700&display=swap" rel="stylesheet"/>
+
+<!-- Socket.IO (for real-time when backend is live) -->
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+
+<!-- Main Stylesheet -->
+<link rel="stylesheet" href="css/styles.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     TOAST NOTIFICATION CONTAINER
+═══════════════════════════════════════ -->
+<div id="tc"></div>
+
+<!-- ═══════════════════════════════════════
+     VOICE LANGUAGE PANEL
+═══════════════════════════════════════ -->
+<div class="voice-panel" id="voice-panel">
+  <div class="vp-header">
+    <strong>🎙️ Voice Assistant</strong>
+    <button class="vp-close" onclick="closeVoicePanel()">✕</button>
+  </div>
+  <div class="vp-lang-grid">
+    <button class="vp-lang-btn active" onclick="setVoiceLang('en-US','English',this)">🇺🇸 English</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('hi-IN','Hindi',this)">🇮🇳 Hindi</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('mr-IN','Marathi',this)">🇮🇳 Marathi</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('gu-IN','Gujarati',this)">🇮🇳 Gujarati</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('es-ES','Spanish',this)">🇪🇸 Spanish</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('fr-FR','French',this)">🇫🇷 French</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('zh-CN','Chinese',this)">🇨🇳 Chinese</button>
+    <button class="vp-lang-btn" onclick="setVoiceLang('ta-IN','Tamil',this)">🇮🇳 Tamil</button>
+  </div>
+  <div class="vp-cmds" id="vp-cmds">
+    <strong>Commands (English):</strong><br>
+    "join queue" · "cancel token" · "my position" · "browse services"<br>
+    "find clinic" · "find salon" · "find pharmacy" · "find bank" · "find barber" · "find grocery"<br>
+    "search for [name]" · "notifications" · "history" · "home" · "profile" · "faq" · "wait time"
+  </div>
+  <div class="vp-status" id="vp-status">Ready. Tap 🎙️ to speak.</div>
+  <button class="btn btn-primary btn-full" style="margin-top:10px" onclick="triggerVoice()">🎙️ Tap to Speak</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODALS
+═══════════════════════════════════════ -->
+
+<!-- Notify Single Customer -->
+<div class="mo" id="mo-notify">
+  <div class="md">
+    <h2>📣 Notify Customer</h2>
+    <p class="ms">Send a real-time message to Token <strong id="mn-tok">—</strong></p>
+    <div class="fg"><label>Message Type</label>
+      <select class="fi" id="mn-type" onchange="this.value==='custom'?document.getElementById('mn-cw').style.display='block':document.getElementById('mn-cw').style.display='none'">
+        <option value="turn">✅ It's your turn! Please proceed.</option>
+        <option value="soon">⏳ Your turn in 5 minutes</option>
+        <option value="delay">⚠️ Queue delayed</option>
+        <option value="paused">🚫 Service paused temporarily</option>
+        <option value="custom">✏️ Custom message</option>
+      </select>
+    </div>
+    <div class="fg" id="mn-cw" style="display:none"><label>Custom Message</label><input class="fi" id="mn-msg" placeholder="Type message…"/></div>
+    <div class="fg"><label>Wait Time (min, optional)</label><input class="fi" id="mn-wait" type="number" placeholder="e.g. 10" min="0"/></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-notify')">Cancel</button><button class="btn btn-primary" onclick="sendNotify()">Send</button></div>
+  </div>
+</div>
+
+<!-- Add Walk-in Customer -->
+<div class="mo" id="mo-walkin">
+  <div class="md">
+    <h2>➕ Add Walk-in Customer</h2>
+    <p class="ms">Manually add a customer to the queue.</p>
+    <div class="fg"><label>Customer Name</label><input class="fi" id="wi-name" placeholder="e.g. Ahmed Ali (optional)"/></div>
+    <div class="fg"><label>Service</label><select class="fi" id="wi-svc"></select></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-walkin')">Cancel</button><button class="btn btn-success" onclick="addWalkIn()">Add to Queue</button></div>
+  </div>
+</div>
+
+<!-- Delay Queue -->
+<div class="mo" id="mo-delay">
+  <div class="md">
+    <h2>⏱️ Delay Queue</h2>
+    <p class="ms">All waiting customers will be notified of the delay.</p>
+    <div class="fg"><label>Delay Duration (minutes)</label><input class="fi" id="dl-mins" type="number" placeholder="e.g. 15" min="1"/></div>
+    <div class="fg"><label>Reason</label><input class="fi" id="dl-reason" placeholder="e.g. Doctor unavailable"/></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-delay')">Cancel</button><button class="btn btn-warn" onclick="applyDelay()">Notify All</button></div>
+  </div>
+</div>
+
+<!-- Edit Profile -->
+<div class="mo" id="mo-profile">
+  <div class="md">
+    <h2>✏️ Edit Profile</h2>
+    <p class="ms">Update your personal information.</p>
+    <div class="fg"><label>Full Name</label><input class="fi" id="ep-name" placeholder="Your name"/></div>
+    <div class="fg"><label>Email</label><input class="fi" id="ep-email" type="email" placeholder="email@example.com"/></div>
+    <div class="fg"><label>Phone Number</label><input class="fi" id="ep-phone" placeholder="+91 98765 43210"/></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-profile')">Cancel</button><button class="btn btn-primary" onclick="saveProfile()">Save</button></div>
+  </div>
+</div>
+
+<!-- Join Queue -->
+<div class="mo" id="mo-join">
+  <div class="md">
+    <h2 id="mj-title">Join Queue</h2>
+    <p class="ms" id="mj-sub">Select your service and join.</p>
+    <div class="fg"><label>Service Type</label><select class="fi" id="mj-svc"></select></div>
+    <div class="fg"><label>Your Contact (for alerts)</label><input class="fi" id="mj-contact" placeholder="Phone or email"/></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-join')">Cancel</button><button class="btn btn-primary" id="mj-btn" onclick="confirmJoin()">Join Queue</button></div>
+  </div>
+</div>
+
+<!-- Add Business (Modal) -->
+<div class="mo" id="mo-addbiz">
+  <div class="md">
+    <h2>🏢 Register Business</h2>
+    <p class="ms">Add a new business to the platform.</p>
+    <div class="fg"><label>Business Name</label><input class="fi" id="ab-name" placeholder="e.g. Sunrise Clinic"/></div>
+    <div class="fg"><label>Type</label>
+      <select class="fi" id="ab-type">
+        <option value="clinic">🏥 Clinic / Hospital</option>
+        <option value="salon">💇 Salon / Beauty</option>
+        <option value="barber">✂️ Barber Shop</option>
+        <option value="grocery">🛒 Grocery Store</option>
+        <option value="pharmacy">💊 Pharmacy</option>
+        <option value="bank">🏦 Bank</option>
+        <option value="service">🔧 Service Center</option>
+        <option value="other">📦 Other</option>
+      </select>
+    </div>
+    <div class="fg"><label>Address / Location</label><input class="fi" id="ab-loc" placeholder="Street, City"/></div>
+    <div class="fg"><label>Opening Hours</label><input class="fi" id="ab-hrs" placeholder="e.g. 9:00 AM – 6:00 PM"/></div>
+    <div class="ma"><button class="btn btn-ghost" onclick="cm('mo-addbiz')">Cancel</button><button class="btn btn-primary" id="ab-btn" onclick="createBusiness()">Create Business</button></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     VOICE ASSISTANT FAB
+═══════════════════════════════════════ -->
+<button class="vf" id="vf" onclick="openVoicePanel()" title="Voice Assistant — Click to open">🎙️</button>
+<div class="vtt" id="vtt">
+  <strong>Voice Assistant</strong><br>
+  Say: "join queue", "my position", "cancel token"
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE: LANDING
+═══════════════════════════════════════ -->
+<div class="page active" id="page-landing">
+  <nav class="ln">
+    <div class="brand">Queue<em>less</em></div>
+    <div class="lnb">
+      <button class="btn bw" onclick="sp('page-login')">Sign In</button>
+      <button class="btn bbl" onclick="sp('page-register')">Get Started</button>
+    </div>
+  </nav>
+  <section class="hero">
+    <div class="hi">
+      <div class="hp"><span class="pd"></span>Real-time Queue Management</div>
+      <h1>No More<br><span class="gr">Waiting Around.</span></h1>
+      <p>Join virtual queues at clinics, salons, banks and more. Get live token updates, voice alerts, and turn notifications — instantly.</p>
+      <div class="hcta">
+        <button class="btn btn-lg bbl" onclick="sp('page-register')">Create Free Account</button>
+        <button class="btn btn-lg bw" onclick="sp('page-login')">Sign In</button>
+      </div>
+      <div class="hst">
+        <div class="hs"><div class="n">Live</div><div class="l">Real-time Updates</div></div>
+        <div class="hs"><div class="n">🎙️</div><div class="l">Voice Assistant</div></div>
+        <div class="hs"><div class="n">0s</div><div class="l">Setup Time</div></div>
+        <div class="hs"><div class="n">100%</div><div class="l">Digital Queue</div></div>
+      </div>
+    </div>
+  </section>
+  <section class="fs">
+    <div class="ft">Everything. In one place.</div>
+    <div class="fg2">
+      <div class="fc"><div class="fi2">🎫</div><h4>Instant Token</h4><p>Join any queue in one tap, get your token immediately.</p></div>
+      <div class="fc"><div class="fi2">📡</div><h4>Live Tracking</h4><p>Real-time position updates via WebSocket technology.</p></div>
+      <div class="fc"><div class="fi2">🔔</div><h4>Smart Alerts</h4><p>Notified 5 minutes before your turn with sound alerts.</p></div>
+      <div class="fc"><div class="fi2">🎙️</div><h4>Voice Assistant</h4><p>Speak commands — join, check, cancel without typing.</p></div>
+      <div class="fc"><div class="fi2">🛡️</div><h4>Admin Dashboard</h4><p>Full control — call next, delay, pause, notify everyone.</p></div>
+      <div class="fc"><div class="fi2">📊</div><h4>Analytics</h4><p>Peak hours, wait times, daily customers in clear charts.</p></div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE: LOGIN
+═══════════════════════════════════════ -->
+<div class="page" id="page-login">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px 16px;background:var(--bg)">
+    <div class="aw">
+      <div class="al">
+        <div class="brand">Queue<em>less</em></div>
+        <h2>Welcome back to smarter queuing</h2>
+        <p>Track your token, get live updates, and skip the physical wait.</p>
+        <div class="afl">
+          <div class="af"><div class="afi">🎫</div>Instant token generation</div>
+          <div class="af"><div class="afi">📡</div>Real-time queue updates</div>
+          <div class="af"><div class="afi">🔔</div>Smart turn notifications</div>
+          <div class="af"><div class="afi">🎙️</div>Voice assistance</div>
+        </div>
+      </div>
+      <div class="ar">
+        <div class="at">Sign in to your account</div>
+        <div class="as">Choose your role to continue</div>
+        <div class="atabs">
+          <div class="atab active" id="lt-c" onclick="setRole('customer')">👤 Customer</div>
+          <div class="atab" id="lt-a" onclick="setRole('admin')">🛡️ Admin</div>
+        </div>
+        <div class="fg"><label>Email</label><input class="fi" id="l-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+        <div class="fg"><label>Password</label><input class="fi" id="l-pw" type="password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+        <div class="demo-notice">
+          💡 <strong>Demo Mode:</strong> Use any email &amp; password. Works without a backend server.
+        </div>
+        <button class="btn btn-primary btn-full btn-lg" id="l-btn" onclick="doLogin()">Sign In</button>
+        <div class="alink">No account? <a onclick="sp('page-register')">Create one free →</a></div>
+        <div class="alink" style="margin-top:8px"><a onclick="sp('page-landing')">← Back to home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE: REGISTER
+═══════════════════════════════════════ -->
+<div class="page" id="page-register">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px 16px;background:var(--bg)">
+    <div class="aw">
+      <div class="al">
+        <div class="brand">Queue<em>less</em></div>
+        <h2>Join thousands who skip the wait</h2>
+        <p>Create your free account and start joining queues virtually in seconds.</p>
+        <div class="afl">
+          <div class="af"><div class="afi">🆓</div>Completely free to use</div>
+          <div class="af"><div class="afi">⚡</div>Setup in under 60 seconds</div>
+          <div class="af"><div class="afi">📱</div>Works on any device</div>
+          <div class="af"><div class="afi">🔒</div>Secure &amp; private</div>
+        </div>
+      </div>
+      <div class="ar">
+        <div class="at">Create your account</div>
+        <div class="as">It's free, always.</div>
+        <div class="fg"><label>Full Name</label><input class="fi" id="r-name" placeholder="John Doe"/></div>
+        <div class="fg"><label>Email</label><input class="fi" id="r-email" type="email" placeholder="you@example.com"/></div>
+        <div class="fg"><label>Phone Number</label><input class="fi" id="r-phone" placeholder="+91 98765 43210"/></div>
+        <div class="fg"><label>Password</label><input class="fi" id="r-pw" type="password" placeholder="Min. 6 characters"/></div>
+        <button class="btn btn-primary btn-full btn-lg" id="r-btn" onclick="doRegister()">Create Account</button>
+        <div class="alink">Already have an account? <a onclick="sp('page-login')">Sign in →</a></div>
+        <div class="alink" style="margin-top:8px"><a onclick="sp('page-landing')">← Back</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE: USER DASHBOARD
+═══════════════════════════════════════ -->
+<div class="page" id="page-user">
+  <div class="dl">
+    <!-- Sidebar -->
+    <aside class="sb">
+      <div class="sb-brand"><div class="brand">Queue<em>less</em></div><small>Customer Portal</small></div>
+      <nav class="sbn">
+        <div class="ns">Main</div>
+        <div class="ni active" data-t="home" onclick="ut('home',this)"><span class="ico">🏠</span>Home</div>
+        <div class="ni" data-t="browse" onclick="ut('browse',this)"><span class="ico">🏢</span>Browse Services</div>
+        <div class="ni" data-t="token" onclick="ut('token',this)"><span class="ico">🎫</span>My Token<span class="nb" id="u-tokbadge" style="display:none">1</span></div>
+        <div class="ns">Account</div>
+        <div class="ni" data-t="notifs" onclick="ut('notifs',this)"><span class="ico">🔔</span>Notifications<span class="nb" id="u-notbadge" style="display:none">0</span></div>
+        <div class="ni" data-t="history" onclick="ut('history',this)"><span class="ico">📋</span>Queue History</div>
+        <div class="ni" data-t="profile" onclick="ut('profile',this)"><span class="ico">👤</span>Profile</div>
+        <div class="ns">Support</div>
+        <div class="ni" data-t="faq" onclick="ut('faq',this)"><span class="ico">💬</span>Live FAQ<span class="nb" id="u-faqbadge" style="display:none">!</span></div>
+      </nav>
+      <div class="sb-user">
+        <div class="uc">
+          <div class="av" id="u-av">?</div>
+          <div class="ui"><strong id="u-nm">Guest</strong><small>Customer</small></div>
+          <button class="lb" onclick="logout()" title="Logout">⎋</button>
+        </div>
+      </div>
+    </aside>
+    <!-- Main Content -->
+    <div class="mn">
+      <div class="tb2">
+        <div class="tbl"><h2 id="u-ttl">Home</h2><p id="u-sub">Welcome!</p></div>
+        <div class="tbr">
+          <div class="tbtn" onclick="ut('notifs',null)">🔔<span class="rdd" id="u-rdot" style="display:none"></span></div>
+          <div class="tbtn" onclick="ut('profile',null)">👤</div>
+          <button class="theme-toggle" id="theme-btn-u" onclick="toggleTheme()" title="Toggle Light/Dark Mode">🌙</button>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+        </div>
+      </div>
+      <div class="ca">
+
+        <!-- HOME TAB -->
+        <div class="tv active" id="u-home">
+          <div class="sr">
+            <div class="st bl"><div class="slb">My Token</div><div class="sv" id="uh-tok">—</div><div class="ss" id="uh-biz">No active token</div></div>
+            <div class="st wn"><div class="slb">Position</div><div class="sv" id="uh-pos">—</div><div class="ss">People ahead</div></div>
+            <div class="st gr"><div class="slb">Est. Wait</div><div class="sv" id="uh-wt">—</div><div class="ss">Minutes</div></div>
+            <div class="st pu"><div class="slb">Serving Now</div><div class="sv" id="uh-srv">—</div><div class="ss">Current token</div></div>
+          </div>
+          <div class="card" id="uh-livecard" style="display:none">
+            <div class="card-hd"><h3>📡 Live Queue — <span id="uh-livebiz"></span></h3><span class="ltag"><span class="ldot"></span> Live</span></div>
+            <div class="scroll-x"><table class="tbl2"><thead><tr><th>#</th><th>Token</th><th>Service</th><th>Status</th><th>Est. Wait</th></tr></thead><tbody id="uh-qtbody"></tbody></table></div>
+          </div>
+          <div class="card" id="uh-empty">
+            <div class="card-bd"><div class="es"><span class="ei">🏢</span><p><strong>No active queue.</strong><br>Browse services and join a queue to see live updates here.</p><button class="btn btn-primary" style="margin-top:16px" onclick="ut('browse',null)">Browse Services</button></div></div>
+          </div>
+        </div>
+
+        <!-- BROWSE TAB -->
+        <div class="tv" id="u-browse">
+          <div class="browse-filters">
+            <div class="fg" style="margin:0;flex:1;min-width:160px">
+              <label style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;display:block">📍 Select Location</label>
+              <select class="fi" id="u-loc-filter" onchange="filterBizByLocation()">
+                <option value="">All Locations</option>
+              </select>
+            </div>
+            <div class="fg" style="margin:0;flex:1;min-width:160px">
+              <label style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;display:block">🛎️ Service Type</label>
+              <select class="fi" id="u-svc-filter" onchange="filterBizByLocation()">
+                <option value="">All Services</option>
+                <option value="clinic">🏥 Clinic</option>
+                <option value="salon">💇 Salon</option>
+                <option value="barber">✂️ Barber</option>
+                <option value="grocery">🛒 Grocery</option>
+                <option value="pharmacy">💊 Pharmacy</option>
+                <option value="bank">🏦 Bank</option>
+                <option value="service">🔧 Service Center</option>
+                <option value="other">📦 Other</option>
+              </select>
+            </div>
+            <div class="fg" style="margin:0;flex:2;min-width:200px">
+              <label style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;display:block">🔍 Search</label>
+              <div class="sbar" style="margin:0;border-radius:8px"><span>🔍</span><input id="u-srch" placeholder="Search by name…" oninput="filterBizByLocation()"/></div>
+            </div>
+          </div>
+          <div id="u-loc-hint" style="display:none;padding:8px 12px;background:var(--primary-faint,rgba(99,102,241,.08));border-radius:8px;margin-bottom:12px;font-size:.83rem;color:var(--primary)">
+            Showing services available in <strong id="u-loc-hint-name"></strong>
+          </div>
+          <div class="bg" id="u-bizgrid"><div class="es"><span class="sp"></span><p>Loading…</p></div></div>
+        </div>
+
+        <!-- FAQ TAB -->
+        <div class="tv" id="u-faq">
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-hd"><h3>💬 Ask a Question</h3><span style="font-size:.78rem;color:var(--text2)">Admin will respond live</span></div>
+            <div class="card-bd">
+              <div class="fg"><label>Your Question</label><input class="fi" id="faq-input" placeholder="e.g. How long is the usual wait at Sunrise Clinic?" maxlength="300" onkeydown="if(event.key==='Enter')submitFaq()"/></div>
+              <button class="btn btn-primary" onclick="submitFaq()">📨 Send Question</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hd"><h3>📋 FAQ — Questions &amp; Answers</h3><span class="ltag"><span class="ldot"></span> Live</span></div>
+            <div id="u-faqlist" style="padding:8px 16px 16px">
+              <div class="es"><span class="ei">💬</span><p>No questions yet. Be the first to ask!</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MY TOKEN TAB -->
+        <div class="tv" id="u-token">
+          <div id="u-tokcontent">
+            <div class="card"><div class="card-bd"><div class="es"><span class="ei">🎫</span><p><strong>No token yet.</strong><br>Browse services to join a queue.</p><button class="btn btn-primary" style="margin-top:14px" onclick="ut('browse',null)">Browse Services</button></div></div></div>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS TAB -->
+        <div class="tv" id="u-notifs">
+          <div class="sh"><h3>🔔 Notifications</h3><button class="btn btn-ghost btn-sm" onclick="clearNotifs()">Clear All</button></div>
+          <div class="card"><div id="u-nlist"><div class="es"><span class="ei">🔔</span><p>No notifications yet.</p></div></div></div>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div class="tv" id="u-history">
+          <div class="sh"><h3>📋 Queue History</h3></div>
+          <div class="card"><div class="scroll-x"><table class="tbl2"><thead><tr><th>Business</th><th>Service</th><th>Token</th><th>Date &amp; Time</th><th>Status</th></tr></thead><tbody id="u-histbody"></tbody></table></div></div>
+        </div>
+
+        <!-- PROFILE TAB -->
+        <div class="tv" id="u-profile">
+          <div class="card"><div class="card-bd">
+            <div class="ph">
+              <div class="paw">
+                <div class="pa" id="u-pavatar"><span id="u-pinit">?</span><img id="u-pimg" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%"/></div>
+                <div class="pec" onclick="document.getElementById('u-pfile').click()">📷</div>
+                <input type="file" id="u-pfile" accept="image/*" style="display:none" onchange="uploadPhoto(this)"/>
+              </div>
+              <div class="pi">
+                <h3 id="p-name">—</h3>
+                <p id="p-email">—</p>
+                <p id="p-phone" style="margin-top:3px">—</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="openEditProfile()">✏️ Edit Profile</button>
+            <div class="divider"></div>
+            <div class="r2">
+              <div><div class="stat-lbl">Queues Joined</div><div class="stat-big blue" id="p-joined">0</div></div>
+              <div><div class="stat-lbl">Time Saved (est.)</div><div class="stat-big green" id="p-saved">0m</div></div>
+            </div>
+          </div></div>
+        </div>
+
+      </div><!-- /ca -->
+    </div><!-- /mn -->
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE: ADMIN DASHBOARD
+═══════════════════════════════════════ -->
+<div class="page" id="page-admin">
+  <div class="dl">
+    <!-- Admin Sidebar -->
+    <aside class="sb">
+      <div class="sb-brand"><div class="brand">Queue<em>less</em></div><small class="admin-tag">Admin Panel</small></div>
+      <nav class="sbn">
+        <div class="ns">Dashboard</div>
+        <div class="ni active" onclick="at('overview',this)"><span class="ico">📊</span>Overview</div>
+        <div class="ni" onclick="at('qmgmt',this)"><span class="ico">🎫</span>Queue Management</div>
+        <div class="ni" onclick="at('analytics',this)"><span class="ico">📈</span>Analytics</div>
+        <div class="ns">Business</div>
+        <div class="ni" onclick="at('businesses',this)"><span class="ico">🏢</span>Businesses</div>
+        <div class="ni" onclick="at('services',this)"><span class="ico">🛎️</span>Services</div>
+        <div class="ns">Communication</div>
+        <div class="ni" onclick="at('notifmgmt',this)"><span class="ico">📣</span>Notifications</div>
+        <div class="ni" onclick="at('ahistory',this)"><span class="ico">📋</span>Queue History</div>
+        <div class="ns">Support</div>
+        <div class="ni" onclick="at('afaq',this)"><span class="ico">💬</span>Live FAQ<span class="nb" id="a-faqbadge" style="display:none">0</span></div>
+      </nav>
+      <div class="sb-user">
+        <div class="uc">
+          <div class="av adm">A</div>
+          <div class="ui"><strong>Admin</strong><small>Business Owner</small></div>
+          <button class="lb" onclick="logout()">⎋</button>
+        </div>
+      </div>
+    </aside>
+    <!-- Admin Main Content -->
+    <div class="mn">
+      <div class="tb2">
+        <div class="tbl"><h2 id="a-ttl">Overview</h2><p id="a-sub">Admin dashboard</p></div>
+        <div class="tbr">
+          <button class="btn btn-success btn-sm" onclick="callNext()">📣 Call Next</button>
+          <button class="btn btn-warn btn-sm" onclick="om('mo-delay')">⏱ Delay</button>
+          <button class="btn btn-ghost btn-sm" id="a-pbtn" onclick="togglePause()">⏸ Pause</button>
+          <button class="theme-toggle" id="theme-btn-a" onclick="toggleTheme()" title="Toggle Light/Dark Mode">🌙</button>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+        </div>
+      </div>
+      <div class="ca">
+
+        <!-- OVERVIEW TAB -->
+        <div class="tv active" id="a-overview">
+          <div class="sr">
+            <div class="st gr"><div class="slb">Businesses</div><div class="sv" id="a-sbiz">0</div><div class="ss">Registered</div></div>
+            <div class="st wn"><div class="slb">Waiting</div><div class="sv" id="a-swait">0</div><div class="ss">All queues</div></div>
+            <div class="st bl"><div class="slb">Served Today</div><div class="sv" id="a-sserved">0</div><div class="ss">Completed</div></div>
+            <div class="st pu"><div class="slb">Avg Wait</div><div class="sv" id="a-savg">~8m</div><div class="ss">Per customer</div></div>
+          </div>
+          <div class="qcb">
+            <div class="qcs"><span id="a-statusdot" style="font-size:1.1rem">🟢</span><div><div class="qlb">Queue Status</div><div class="qlv" id="a-qstatus">Active</div></div></div>
+            <select class="fi" id="a-ovbiz" style="max-width:210px" onchange="loadOvQueue()"><option value="">All Businesses</option></select>
+            <button class="btn btn-primary btn-sm" onclick="callNext()">📣 Call Next Token</button>
+            <button class="btn btn-soft btn-sm" onclick="om('mo-walkin')">➕ Walk-in</button>
+            <button class="btn btn-ghost btn-sm" onclick="aRefresh()">↻ Refresh</button>
+          </div>
+          <div class="card">
+            <div class="card-hd"><h3>🎫 Live Queue</h3><span class="ltag"><span class="ldot"></span> Live</span></div>
+            <div class="scroll-x"><table class="aqt"><thead><tr><th>#</th><th>Token</th><th>Customer</th><th>Service</th><th>Status</th><th>Wait</th><th>Actions</th></tr></thead><tbody id="a-ovbody"></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- QUEUE MANAGEMENT TAB -->
+        <div class="tv" id="a-qmgmt">
+          <div class="card" style="margin-bottom:16px"><div class="card-bd">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+              <div class="fg" style="margin:0;flex:1;min-width:180px"><label>Business</label><select class="fi" id="a-qmbiz" onchange="loadQMQ()"></select></div>
+              <button class="btn btn-success" onclick="callNext()">📣 Call Next</button>
+              <button class="btn btn-soft" onclick="om('mo-walkin')">➕ Walk-in</button>
+              <button class="btn btn-warn" onclick="om('mo-delay')">⏱ Delay</button>
+              <button class="btn btn-ghost" id="qm-pbtn" onclick="togglePause()">⏸ Pause</button>
+            </div>
+          </div></div>
+          <div class="card" style="margin-bottom:16px"><div class="card-bd" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span style="font-size:1.4rem">🔊</span>
+            <div style="flex:1"><strong style="font-size:.88rem">Audio Announcement</strong><p style="font-size:.78rem;color:var(--text2);margin-top:2px">Call a token number aloud via speaker</p></div>
+            <input class="fi" id="aud-tok" type="number" placeholder="Token #" style="max-width:90px"/>
+            <button class="btn btn-primary" onclick="audioAnnounce(document.getElementById('aud-tok').value)">🔊 Announce</button>
+          </div></div>
+          <div class="card">
+            <div class="card-hd"><h3>🎫 Queue — <span id="qm-biztitle"></span></h3><span class="ltag"><span class="ldot"></span> Live</span></div>
+            <div class="scroll-x"><table class="aqt"><thead><tr><th>#</th><th>Token</th><th>Customer</th><th>Service</th><th>Status</th><th>Wait</th><th>Actions</th></tr></thead><tbody id="a-qmbody"><tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted)">Select a business above.</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- ANALYTICS TAB -->
+        <div class="tv" id="a-analytics">
+          <div class="sr">
+            <div class="st gr"><div class="slb">Customers Today</div><div class="sv" id="an-today">52</div><div class="ss">Total joined</div></div>
+            <div class="st wn"><div class="slb">Avg Wait</div><div class="sv" id="an-avg">18m</div><div class="ss">Per customer</div></div>
+            <div class="st bl"><div class="slb">Peak Hour</div><div class="sv" id="an-peak">11am</div><div class="ss">Busiest time</div></div>
+            <div class="st pu"><div class="slb">Completion</div><div class="sv" id="an-rate">91%</div><div class="ss">Served vs joined</div></div>
+          </div>
+          <div class="r2" style="margin-bottom:14px">
+            <div class="card"><div class="card-hd"><h3>📊 Hourly Customers</h3></div><div class="card-bd"><div class="cbw" id="an-hchart"></div></div></div>
+            <div class="card"><div class="card-hd"><h3>⏱ Wait Time Trend</h3></div><div class="card-bd"><div class="cbw" id="an-wchart"></div></div></div>
+          </div>
+          <div class="card"><div class="card-hd"><h3>📋 Weekly Summary</h3></div>
+            <div class="scroll-x"><table class="tbl2"><thead><tr><th>Date</th><th>Total</th><th>Avg Wait</th><th>Peak</th><th>Completion</th></tr></thead><tbody id="an-weekly"></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- BUSINESSES TAB -->
+        <div class="tv" id="a-businesses">
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-hd"><h3>➕ Register New Business</h3><button class="btn btn-primary btn-sm" onclick="om('mo-addbiz')">+ New Business</button></div>
+            <div class="card-bd">
+              <div class="r2">
+                <div class="fg"><label>Business Name</label><input class="fi" id="ab2-name" placeholder="e.g. Sunrise Clinic"/></div>
+                <div class="fg"><label>Type</label><select class="fi" id="ab2-type"><option value="clinic">🏥 Clinic</option><option value="salon">💇 Salon</option><option value="barber">✂️ Barber</option><option value="grocery">🛒 Grocery</option><option value="pharmacy">💊 Pharmacy</option><option value="bank">🏦 Bank</option><option value="service">🔧 Service Center</option><option value="other">📦 Other</option></select></div>
+              </div>
+              <div class="r2">
+                <div class="fg"><label>Address</label><input class="fi" id="ab2-loc" placeholder="Street, City"/></div>
+                <div class="fg"><label>Hours</label><input class="fi" id="ab2-hrs" placeholder="9am – 6pm"/></div>
+              </div>
+              <button class="btn btn-primary" id="ab2-btn" onclick="createBusiness2()">Create Business</button>
+            </div>
+          </div>
+          <div class="card"><div class="card-hd"><h3>🏢 All Businesses</h3><button class="btn btn-ghost btn-sm" onclick="loadBizTable()">↻ Refresh</button></div>
+            <div class="scroll-x"><table class="tbl2"><thead><tr><th>Name</th><th>Type</th><th>Address</th><th>Hours</th><th>Queue</th><th>Action</th><th>Delete</th></tr></thead><tbody id="a-biztable"></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- SERVICES TAB -->
+        <div class="tv" id="a-services">
+          <div class="card" style="margin-bottom:16px"><div class="card-bd">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+              <div class="fg" style="margin:0;flex:2;min-width:160px"><label>Service Name</label><input class="fi" id="sv-name" placeholder="e.g. General Consultation"/></div>
+              <div class="fg" style="margin:0;width:110px"><label>Time (min)</label><input class="fi" id="sv-time" type="number" placeholder="15"/></div>
+              <div class="fg" style="margin:0;width:130px"><label>Category</label><select class="fi" id="sv-cat"><option>Clinic</option><option>Salon</option><option>Barber</option><option>Grocery</option><option>Pharmacy</option><option>Bank</option></select></div>
+              <button class="btn btn-primary" onclick="addSvc()">Add Service</button>
+            </div>
+          </div></div>
+          <div class="svc-grid" id="a-svcgrid"></div>
+        </div>
+
+        <!-- NOTIFICATIONS TAB -->
+        <div class="tv" id="a-notifmgmt">
+          <div class="card" style="margin-bottom:16px"><div class="card-hd"><h3>📡 Broadcast to All Customers</h3></div><div class="card-bd">
+            <div class="fg"><label>Business</label><select class="fi" id="a-notifbiz" onchange="loadNotifQ()"></select></div>
+            <div class="fg"><label>Message</label><input class="fi" id="a-broadcast" placeholder="e.g. Doctor will arrive at 3 PM…"/></div>
+            <button class="btn btn-primary" onclick="sendBroadcast()">📡 Send to All</button>
+          </div></div>
+          <div class="card"><div class="card-hd"><h3>🔔 Notify Individual Token</h3><span class="ltag"><span class="ldot"></span> Live</span></div>
+            <div class="scroll-x"><table class="aqt"><thead><tr><th>Token</th><th>Service</th><th>Status</th><th>Joined</th><th>Action</th></tr></thead><tbody id="a-notifbody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Select a business above.</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div class="tv" id="a-ahistory">
+          <div class="sr">
+            <div class="st gr"><div class="slb">This Week</div><div class="sv">318</div><div class="ss">Total customers</div></div>
+            <div class="st wn"><div class="slb">Daily Avg</div><div class="sv">53</div><div class="ss">Customers/day</div></div>
+          </div>
+          <div class="card"><div class="card-hd"><h3>📋 Queue History Log</h3></div>
+            <div class="scroll-x"><table class="tbl2"><thead><tr><th>Date</th><th>Business</th><th>Total</th><th>Avg Wait</th><th>Peak Token</th></tr></thead><tbody id="a-histbody"></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- FAQ MANAGEMENT TAB -->
+        <div class="tv" id="a-afaq">
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-hd">
+              <h3>💬 Customer Questions</h3>
+              <span class="ltag"><span class="ldot"></span> Live</span>
+            </div>
+            <div id="a-faqlist" style="padding:8px 16px 16px">
+              <div class="es"><span class="ei">💬</span><p>No questions from customers yet.</p></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /ca -->
+    </div><!-- /mn -->
+  </div>
+</div>
+
+<!-- Main Application Script -->
+<script src="js/app.js"></script>
+</body>
+</html>
