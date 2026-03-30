@@ -6,6 +6,8 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const db = require("./config/db");
+const { seedAdminFromEnv } = require("./utils/seedAdmin");
+const { seedBusinessesFromJson } = require("./utils/seedBusinesses");
 
 const authRoutes = require("./routes/authRoutes");
 const businessRoutes = require("./routes/businessRoutes");
@@ -26,6 +28,14 @@ app.use("/api/business", businessRoutes);
 app.use("/api/queue", queueRoutes);
 app.use("/api/voice", voiceRoutes);
 app.use("/api/faq", faqRoutes);
+
+seedAdminFromEnv().catch((error) => {
+    console.error("Admin seed failed", error);
+});
+
+seedBusinessesFromJson().catch((error) => {
+    console.error("Businesses seed failed", error);
+});
 
 app.get("/", (req,res)=>{
     res.send("QueueLess Backend Running");

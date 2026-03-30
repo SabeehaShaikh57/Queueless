@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Admin 1",
+    "email": "sabeeha.2403724201@vcet.edu.in",
+    "password": "sabeeha@006#",
+    "role": "admin"
+  },
+  {
+    "name": "Admin 2",
+    "email": "admin2@test.com",
+    "password": "123456",
+    "role": "admin"
+  },
+  {
+    "name": "User 1",
+    "email": "user1@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 2",
+    "email": "user2@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 3",
+    "email": "user3@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 4",
+    "email": "user4@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 5",
+    "email": "user5@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 6",
+    "email": "user6@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 7",
+    "email": "user7@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 8",
+    "email": "user8@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 9",
+    "email": "user9@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 10",
+    "email": "user10@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 11",
+    "email": "user11@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 12",
+    "email": "user12@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 13",
+    "email": "user13@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 14",
+    "email": "user14@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 15",
+    "email": "user15@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 16",
+    "email": "user16@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 17",
+    "email": "user17@test.com",
+    "password": "123456",
+    "role": "customer"
+  },
+  {
+    "name": "User 18",
+    "email": "user18@test.com",
+    "password": "123456",
+    "role": "customer"
+  }
+]

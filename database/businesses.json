@@ -1,0 +1,632 @@
+[
+  {
+    "name": "City Hospital",
+    "type": "hospital",
+    "address": "Andheri",
+    "city": "Mumbai",
+    "hours": "9AM-9PM",
+    "services": [
+      {
+        "name": "Checkup",
+        "estTime": 15
+      },
+      {
+        "name": "Dental",
+        "estTime": 20
+      },
+      {
+        "name": "X-Ray",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "HealthCare Plus",
+    "type": "hospital",
+    "address": "Powai",
+    "city": "Mumbai",
+    "hours": "24hrs",
+    "services": [
+      {
+        "name": "Emergency",
+        "estTime": 5
+      },
+      {
+        "name": "ICU Admission",
+        "estTime": 10
+      },
+      {
+        "name": "Blood Test",
+        "estTime": 8
+      }
+    ]
+  },
+  {
+    "name": "Care Hospital",
+    "type": "hospital",
+    "address": "Navi Mumbai",
+    "city": "Mumbai",
+    "hours": "24hrs",
+    "services": [
+      {
+        "name": "Checkup",
+        "estTime": 20
+      },
+      {
+        "name": "Vaccination",
+        "estTime": 10
+      },
+      {
+        "name": "Surgery Consultation",
+        "estTime": 30
+      }
+    ]
+  },
+  {
+    "name": "Wellness Hospital",
+    "type": "hospital",
+    "address": "Colaba",
+    "city": "Mumbai",
+    "hours": "24hrs",
+    "services": [
+      {
+        "name": "Surgery",
+        "estTime": 60
+      },
+      {
+        "name": "Physiotherapy",
+        "estTime": 40
+      },
+      {
+        "name": "Cardiology",
+        "estTime": 25
+      }
+    ]
+  },
+  {
+    "name": "Apollo Care",
+    "type": "hospital",
+    "address": "Andheri East",
+    "city": "Mumbai",
+    "hours": "24hrs",
+    "services": [
+      {
+        "name": "Emergency",
+        "estTime": 5
+      },
+      {
+        "name": "Pathology",
+        "estTime": 15
+      },
+      {
+        "name": "Orthopaedics",
+        "estTime": 20
+      }
+    ]
+  },
+  {
+    "name": "Green Hospital",
+    "type": "hospital",
+    "address": "Airoli",
+    "city": "Mumbai",
+    "hours": "24hrs",
+    "services": [
+      {
+        "name": "Emergency",
+        "estTime": 5
+      },
+      {
+        "name": "Maternity",
+        "estTime": 30
+      },
+      {
+        "name": "Checkup",
+        "estTime": 15
+      }
+    ]
+  },
+  {
+    "name": "Metro Clinic",
+    "type": "clinic",
+    "address": "Bandra",
+    "city": "Mumbai",
+    "hours": "10AM-8PM",
+    "services": [
+      {
+        "name": "Consultation",
+        "estTime": 10
+      },
+      {
+        "name": "Follow-up",
+        "estTime": 8
+      },
+      {
+        "name": "Prescription",
+        "estTime": 5
+      }
+    ]
+  },
+  {
+    "name": "Quick Clinic",
+    "type": "clinic",
+    "address": "Kurla",
+    "city": "Mumbai",
+    "hours": "9AM-6PM",
+    "services": [
+      {
+        "name": "General",
+        "estTime": 12
+      },
+      {
+        "name": "ENT",
+        "estTime": 15
+      },
+      {
+        "name": "Eye Check",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "Family Clinic",
+    "type": "clinic",
+    "address": "Matunga",
+    "city": "Mumbai",
+    "hours": "9AM-6PM",
+    "services": [
+      {
+        "name": "Checkup",
+        "estTime": 15
+      },
+      {
+        "name": "Paediatrics",
+        "estTime": 12
+      },
+      {
+        "name": "Skin",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "Prime Clinic",
+    "type": "clinic",
+    "address": "Mulund",
+    "city": "Mumbai",
+    "hours": "9AM-7PM",
+    "services": [
+      {
+        "name": "Dental",
+        "estTime": 25
+      },
+      {
+        "name": "General",
+        "estTime": 12
+      },
+      {
+        "name": "Blood Report",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "Urban Clinic",
+    "type": "clinic",
+    "address": "Vashi",
+    "city": "Mumbai",
+    "hours": "9AM-7PM",
+    "services": [
+      {
+        "name": "Consultation",
+        "estTime": 15
+      },
+      {
+        "name": "Vaccination",
+        "estTime": 8
+      },
+      {
+        "name": "Checkup",
+        "estTime": 12
+      }
+    ]
+  },
+  {
+    "name": "Care Clinic",
+    "type": "clinic",
+    "address": "Rabale",
+    "city": "Mumbai",
+    "hours": "9AM-7PM",
+    "services": [
+      {
+        "name": "Dental",
+        "estTime": 20
+      },
+      {
+        "name": "General",
+        "estTime": 10
+      },
+      {
+        "name": "Follow-up",
+        "estTime": 8
+      }
+    ]
+  },
+  {
+    "name": "Glow Salon",
+    "type": "salon",
+    "address": "Juhu",
+    "city": "Mumbai",
+    "hours": "10AM-9PM",
+    "services": [
+      {
+        "name": "Haircut",
+        "estTime": 30
+      },
+      {
+        "name": "Facial",
+        "estTime": 45
+      },
+      {
+        "name": "Manicure",
+        "estTime": 25
+      }
+    ]
+  },
+  {
+    "name": "Beauty Hub",
+    "type": "salon",
+    "address": "Malad",
+    "city": "Mumbai",
+    "hours": "10AM-8PM",
+    "services": [
+      {
+        "name": "Facial",
+        "estTime": 40
+      },
+      {
+        "name": "Waxing",
+        "estTime": 30
+      },
+      {
+        "name": "Eyebrows",
+        "estTime": 15
+      }
+    ]
+  },
+  {
+    "name": "Style Salon",
+    "type": "salon",
+    "address": "Chembur",
+    "city": "Mumbai",
+    "hours": "10AM-9PM",
+    "services": [
+      {
+        "name": "Hair Spa",
+        "estTime": 45
+      },
+      {
+        "name": "Keratin",
+        "estTime": 90
+      },
+      {
+        "name": "Hair Color",
+        "estTime": 60
+      }
+    ]
+  },
+  {
+    "name": "Luxury Salon",
+    "type": "salon",
+    "address": "Santacruz",
+    "city": "Mumbai",
+    "hours": "10AM-8PM",
+    "services": [
+      {
+        "name": "Makeup",
+        "estTime": 50
+      },
+      {
+        "name": "Bridal Package",
+        "estTime": 120
+      },
+      {
+        "name": "Facial",
+        "estTime": 40
+      }
+    ]
+  },
+  {
+    "name": "Modern Salon",
+    "type": "salon",
+    "address": "Kandivali",
+    "city": "Mumbai",
+    "hours": "10AM-9PM",
+    "services": [
+      {
+        "name": "Haircut",
+        "estTime": 25
+      },
+      {
+        "name": "Hair Color",
+        "estTime": 60
+      },
+      {
+        "name": "Straightening",
+        "estTime": 90
+      }
+    ]
+  },
+  {
+    "name": "Elite Salon",
+    "type": "salon",
+    "address": "Vasai",
+    "city": "Mumbai",
+    "hours": "10AM-9PM",
+    "services": [
+      {
+        "name": "Facial",
+        "estTime": 45
+      },
+      {
+        "name": "Haircut",
+        "estTime": 25
+      },
+      {
+        "name": "Pedicure",
+        "estTime": 30
+      }
+    ]
+  },
+  {
+    "name": "Smart Bank",
+    "type": "bank",
+    "address": "Dadar",
+    "city": "Mumbai",
+    "hours": "9AM-4PM",
+    "services": [
+      {
+        "name": "Account Opening",
+        "estTime": 25
+      },
+      {
+        "name": "KYC Update",
+        "estTime": 15
+      },
+      {
+        "name": "Cheque Deposit",
+        "estTime": 5
+      }
+    ]
+  },
+  {
+    "name": "Finance Bank",
+    "type": "bank",
+    "address": "Thane",
+    "city": "Mumbai",
+    "hours": "9AM-5PM",
+    "services": [
+      {
+        "name": "Loan",
+        "estTime": 30
+      },
+      {
+        "name": "Fixed Deposit",
+        "estTime": 20
+      },
+      {
+        "name": "Withdrawal",
+        "estTime": 8
+      }
+    ]
+  },
+  {
+    "name": "Trust Bank",
+    "type": "bank",
+    "address": "Borivali",
+    "city": "Mumbai",
+    "hours": "9AM-4PM",
+    "services": [
+      {
+        "name": "Deposit",
+        "estTime": 10
+      },
+      {
+        "name": "Passbook Update",
+        "estTime": 5
+      },
+      {
+        "name": "Loan Inquiry",
+        "estTime": 20
+      }
+    ]
+  },
+  {
+    "name": "Secure Bank",
+    "type": "bank",
+    "address": "Ghatkopar",
+    "city": "Mumbai",
+    "hours": "9AM-5PM",
+    "services": [
+      {
+        "name": "KYC",
+        "estTime": 20
+      },
+      {
+        "name": "Demand Draft",
+        "estTime": 15
+      },
+      {
+        "name": "Debit Card",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "Global Bank",
+    "type": "bank",
+    "address": "Churchgate",
+    "city": "Mumbai",
+    "hours": "9AM-4PM",
+    "services": [
+      {
+        "name": "Transfer",
+        "estTime": 15
+      },
+      {
+        "name": "Net Banking Help",
+        "estTime": 10
+      },
+      {
+        "name": "Account Closure",
+        "estTime": 20
+      }
+    ]
+  },
+  {
+    "name": "National Bank",
+    "type": "bank",
+    "address": "Kalyan",
+    "city": "Mumbai",
+    "hours": "9AM-5PM",
+    "services": [
+      {
+        "name": "Loan",
+        "estTime": 30
+      },
+      {
+        "name": "Deposit",
+        "estTime": 8
+      },
+      {
+        "name": "Savings Account",
+        "estTime": 20
+      }
+    ]
+  },
+  {
+    "name": "MedPlus Pharmacy",
+    "type": "pharmacy",
+    "address": "Bandra",
+    "city": "Mumbai",
+    "hours": "8AM-10PM",
+    "services": [
+      {
+        "name": "Prescription Fill",
+        "estTime": 8
+      },
+      {
+        "name": "OTC Purchase",
+        "estTime": 5
+      },
+      {
+        "name": "Consultation",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "Apollo Pharmacy",
+    "type": "pharmacy",
+    "address": "Andheri",
+    "city": "Mumbai",
+    "hours": "8AM-10PM",
+    "services": [
+      {
+        "name": "Prescription Fill",
+        "estTime": 8
+      },
+      {
+        "name": "Refill",
+        "estTime": 5
+      },
+      {
+        "name": "BP Check",
+        "estTime": 5
+      }
+    ]
+  },
+  {
+    "name": "CityMed Pharmacy",
+    "type": "pharmacy",
+    "address": "Thane",
+    "city": "Mumbai",
+    "hours": "8AM-9PM",
+    "services": [
+      {
+        "name": "Prescription",
+        "estTime": 8
+      },
+      {
+        "name": "OTC",
+        "estTime": 5
+      },
+      {
+        "name": "Vitamins Consult",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "FreshMart Grocery",
+    "type": "grocery",
+    "address": "Powai",
+    "city": "Mumbai",
+    "hours": "7AM-10PM",
+    "services": [
+      {
+        "name": "Regular Shopping",
+        "estTime": 15
+      },
+      {
+        "name": "Pickup Order",
+        "estTime": 5
+      },
+      {
+        "name": "Returns",
+        "estTime": 10
+      }
+    ]
+  },
+  {
+    "name": "D-Mart Borivali",
+    "type": "grocery",
+    "address": "Borivali",
+    "city": "Mumbai",
+    "hours": "8AM-10PM",
+    "services": [
+      {
+        "name": "Billing Counter",
+        "estTime": 10
+      },
+      {
+        "name": "Pickup",
+        "estTime": 5
+      },
+      {
+        "name": "Returns",
+        "estTime": 8
+      }
+    ]
+  },
+  {
+    "name": "Big Bazaar Thane",
+    "type": "grocery",
+    "address": "Thane",
+    "city": "Mumbai",
+    "hours": "9AM-10PM",
+    "services": [
+      {
+        "name": "Billing Counter",
+        "estTime": 10
+      },
+      {
+        "name": "Customer Service",
+        "estTime": 12
+      },
+      {
+        "name": "Returns",
+        "estTime": 8
+      }
+    ]
+  }
+]

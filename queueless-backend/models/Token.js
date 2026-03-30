@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const tokenSchema = new mongoose.Schema(
   {
+    customer_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
     business_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Business",
@@ -11,7 +17,7 @@ const tokenSchema = new mongoose.Schema(
     token_number: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["waiting", "serving", "completed"],
+      enum: ["waiting", "serving", "completed", "cancelled"],
       default: "waiting",
       index: true,
     },

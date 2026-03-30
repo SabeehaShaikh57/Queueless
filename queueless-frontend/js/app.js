@@ -68,6 +68,20 @@ let recognition = null, listening = false;
 let pendingBiz = null;
 let adminHist = [];
 let faqPollId = null;
+let faqAnswerDraft = {};
+
+function normBusiness(raw) {
+  const address = String(raw?.address || '').trim();
+  const city = String(raw?.city || '').trim();
+  const location = String(raw?.location || '').trim() || (city ? `${address}, ${city}` : address);
+  return {
+    ...raw,
+    id: String(raw?.id || raw?._id || ''),
+    location,
+    address,
+    city,
+  };
+}
 
 function addAdminHist(bizId, tokenNumber, status, action, avgWait='--') {
   const biz = bizList.find(b => String(b.id) === String(bizId));
@@ -145,7 +159,10 @@ let demoTokenCounter = { 1:17, 2:8, 3:5, 4:1, 5:1, 6:1 };
 
 async function getBiz() {
   const r = await api('GET', '/business/list');
-  if (r.ok) { bizList = r.data; return bizList; }
+  if (r.ok && Array.isArray(r.data)) {
+    bizList = r.data.map(normBusiness).filter(b => b.id);
+    return bizList;
+  }
   bizList = [...DEMO_BIZ]; return bizList;
 }
 
@@ -156,8 +173,15 @@ async function getQueue(bizId) {
 }
 
 async function joinQueue(bizId, customerName, service) {
-  const r = await api('POST', '/queue/join', { business_id: bizId });
-  if (r.ok) return { ok: true, token: r.data.token };
+  const r = await api('POST', '/queue/join', { business_id: bizId, customerName, service });
+  if (r.ok) {
+    return {
+      ok: true,
+      token: r.data.token,
+      tokenId: r.data.tokenId || null,
+    };
+  }
+  if (!r.offline) return { ok: false, err: r.err || 'Could not join queue' };
   // Demo: add to local queue — include customer name & service so admin sees them
   const next = demoTokenCounter[bizId] || 1;
   demoTokenCounter[bizId] = next + 1;
@@ -187,30 +211,54 @@ async function callNextApi(bizId) {
 }
 
 async function doCreateBiz(name, type, location, hours) {
-  const r = await api('POST', '/business/create', { name, type, location });
-  if (r.ok) return true;
+  const parts = String(location || '').split(',').map(s => s.trim()).filter(Boolean);
+  const city = parts.length > 1 ? parts[parts.length - 1] : '';
+  const address = parts.length > 1 ? parts.slice(0, -1).join(', ') : String(location || '').trim();
+  const r = await api('POST', '/business/create', {
+    name,
+    type,
+    location,
+    address,
+    city,
+    hours,
+  });
+  if (r.ok) return { ok: true, data: r.data };
+  if (!r.offline) return { ok: false, err: r.err || 'Failed to create business' };
   // Demo: add locally
   const newId = Math.max(...DEMO_BIZ.map(b=>b.id), 0) + 1;
   DEMO_BIZ.push({ id: newId, name, type, location, hours: hours||'' });
   bizList = [...DEMO_BIZ];
   demoQueues[newId] = [];
   demoTokenCounter[newId] = 1;
-  return true;
+  return { ok: true, data: { business: { id: newId, name, type, location, hours: hours || '' } } };
 }
 
-async function doLogin(email, pw) {
-  const r = await api('POST', '/auth/login', { email, password: pw });
-  if (r.ok) return { ok: true, token: r.data.token };
-  // Demo login — always works
-  const fakeToken = btoa(JSON.stringify({ id: Date.now(), email })) + '.demo.sig';
-  return { ok: true, token: fakeToken, demo: true };
+async function loadQueueHistory() {
+  const r = await api('GET', '/queue/history');
+  if (!r.ok || !Array.isArray(r.data)) return qHistory;
+  qHistory = r.data.map((item) => ({
+    id: String(item.id || ''),
+    business: String(item.business || 'Business'),
+    service: String(item.service || 'General'),
+    token: item.token,
+    date: new Date(item.timestamp).toLocaleDateString('en-IN'),
+    time: new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: String(item.status || 'waiting').replace(/^\w/, (c) => c.toUpperCase()),
+    timestamp: item.timestamp,
+  }));
+  return qHistory;
+}
+
+async function doLoginApi(email, pw, role) {
+  const r = await api('POST', '/auth/login', { email, password: pw, role });
+  if (!r.ok) return { ok: false, err: r.err };
+  return { ok: true, data: r.data };
 }
 
 async function doRegisterApi(name, email, pw) {
   const r = await api('POST', '/auth/register', { name, email, password: pw });
-  if (r.ok) return { ok: true };
-  // Demo — always works
-  return { ok: true, demo: true };
+  if (!r.ok) return { ok: false, err: r.err };
+  return { ok: true, data: r.data };
 }
 
 // ═══════════════════════════════════════════
@@ -265,68 +313,46 @@ async function doLogin() {
   if (!email || !pw) return toast('w','Missing fields','Enter email and password.');
   const btn = document.getElementById('l-btn');
   btn.disabled=true; btn.innerHTML='<span class="sp"></span> Signing in…';
-  const r = await doLogin_api(email, pw);
+  const r = await doLoginApi(email, pw, loginRole);
   btn.disabled=false; btn.innerHTML='Sign In';
   if (!r.ok) return toast('e','Login Failed', r.err||'Try again.');
-  ls('ql_tok', r.token);
-  const name = email.split('@')[0];
-  user = { id: Date.now(), email, name, phone:'', role: loginRole };
+
+  const token = r.data?.token;
+  const account = r.data?.user;
+  if (!token || !account) return toast('e','Login Failed','Unexpected server response.');
+
+  ls('ql_tok', token);
+  user = {
+    id: account.id,
+    email: account.email,
+    name: account.name,
+    phone: '',
+    role: account.role || loginRole,
+  };
   ls('ql_user', JSON.stringify(user));
-  toast('s','Welcome back, '+name+'!');
+  toast('s','Welcome back, '+(user.name || user.email)+'!');
   initSocket();
-  if (loginRole==='admin') sp('page-admin');
+  if (user.role==='admin') sp('page-admin');
   else sp('page-user');
 }
-
-// wrapper to avoid name collision
-async function doLogin_api(email, pw) { return doLogin(email, pw); }
-
-// Override to fix name
-(function(){
-  const orig = doLogin;
-  window.doLogin = async function() {
-    const email = document.getElementById('l-email').value.trim();
-    const pw = document.getElementById('l-pw').value;
-    if (!email || !pw) return toast('w','Missing fields','Enter email and password.');
-    const btn = document.getElementById('l-btn');
-    btn.disabled=true; btn.innerHTML='<span class="sp"></span> Signing in…';
-    const r = await api('POST','/auth/login',{email,password:pw});
-    let token;
-    if (r.ok) { token = r.data.token; }
-    else {
-      // Demo mode — always succeed
-      token = btoa(JSON.stringify({id:Date.now(),email})) + '.demo';
-      toast('i','Demo Mode','Backend offline — using demo data.');
-    }
-    btn.disabled=false; btn.innerHTML='Sign In';
-    ls('ql_tok', token);
-    const name = email.split('@')[0];
-    user = { id: Date.now(), email, name, phone:'', role: loginRole };
-    ls('ql_user', JSON.stringify(user));
-    toast('s','Welcome, '+name+'!');
-    initSocket();
-    if (loginRole==='admin') sp('page-admin');
-    else sp('page-user');
-  };
-})();
 
 async function doRegister() {
   const name = document.getElementById('r-name').value.trim();
   const email = document.getElementById('r-email').value.trim();
-  const phone = document.getElementById('r-phone').value.trim();
   const pw = document.getElementById('r-pw').value;
   if (!name||!email||!pw) return toast('w','Missing fields');
   if (pw.length<6) return toast('w','Weak password','Min 6 characters.');
   const btn = document.getElementById('r-btn');
   btn.disabled=true; btn.innerHTML='<span class="sp"></span> Creating…';
-  const r = await api('POST','/auth/register',{name,email,password:pw});
+  const r = await doRegisterApi(name, email, pw);
   btn.disabled=false; btn.innerHTML='Create Account';
-  if (!r.ok && !r.offline) return toast('e','Failed',r.err);
+  if (!r.ok) return toast('e','Failed',r.err||'Registration failed');
   toast('s','Account created!','You can now sign in.');
   sp('page-login');
 }
 
 function logout() {
+  api('POST', '/auth/logout').catch(() => {});
   lsr('ql_tok'); lsr('ql_user');
   user=null; myToken=null;
   clearInterval(pollId); clearInterval(adminPollId);
@@ -349,6 +375,16 @@ function initSocket() {
     socket.on('queue_update',d=>{
       if(myToken && String(d.business_id)===String(myToken.bizId)) refreshMyQueue();
       if(document.getElementById('page-admin').classList.contains('active')) aRefresh();
+    });
+    socket.on('business_changed', async () => {
+      await getBiz();
+      fillAdminSelects();
+      if (document.getElementById('page-admin').classList.contains('active')) {
+        loadBizTable();
+      }
+      if (document.getElementById('page-user').classList.contains('active')) {
+        loadBizGrid();
+      }
     });
     socket.on('notification',d=>{
       addNotif('📣',d.title||'Message',d.message,'i');
@@ -416,7 +452,7 @@ function initUserDash() {
   populateJoinSvc();
   loadBizGrid();
   if(myToken){ renderTokenCard(); refreshMyQueue(); startPoll(); }
-  renderHistory();
+  loadQueueHistory().then(renderHistory);
   loadFaqSession();
   clearInterval(faqPollId);
   faqPollId = setInterval(loadFaqSession, 7000);
@@ -438,12 +474,12 @@ async function loadBizGrid() {
 function populateLocationFilter() {
   const sel = document.getElementById('u-loc-filter');
   if (!sel) return;
-  // Extract unique cities from business locations
+  // Extract unique cities dynamically from business city/location fields.
   const cities = [...new Set(bizList.map(b => {
-    const loc = b.location || '';
-    // Get city part — everything after last comma, or whole string
-    const parts = loc.split(',');
-    return parts.length > 1 ? parts[parts.length - 1].trim() : loc.trim();
+    if (b.city) return String(b.city).trim();
+    const loc = String(b.location || '').trim();
+    const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+    return parts.length > 1 ? parts[parts.length - 1] : loc;
   }).filter(Boolean))].sort();
   const current = sel.value;
   sel.innerHTML = '<option value="">All Locations</option>' +
@@ -458,13 +494,19 @@ function filterBizByLocation() {
   const hintName = document.getElementById('u-loc-hint-name');
   let f = bizList;
   if (loc) {
-    f = f.filter(b => (b.location||'').toLowerCase().includes(loc));
+    f = f.filter(b => {
+      const city = String(b.city || '').toLowerCase();
+      const location = String(b.location || '').toLowerCase();
+      return city === loc || location.includes(loc);
+    });
     if (hint && hintName) { hint.style.display='block'; hintName.textContent = document.getElementById('u-loc-filter').options[document.getElementById('u-loc-filter').selectedIndex].text; }
   } else {
     if (hint) hint.style.display='none';
   }
   if (type) f = f.filter(b => (b.type||'').toLowerCase() === type);
-  if (q)    f = f.filter(b => (b.name+b.type+(b.location||'')).toLowerCase().includes(q));
+  if (q) {
+    f = f.filter(b => (b.name + b.type + (b.location || '') + (b.city || '') + (b.address || '')).toLowerCase().includes(q));
+  }
   renderBizGrid(f);
 }
 
@@ -482,7 +524,7 @@ function renderBizGrid(list) {
         <div class="bm">
           <div class="bn">${esc(b.name)}</div>
           <div class="bt">${esc(b.type||'Business')}</div>
-          <div class="ba">📍 ${esc(b.location||'Address not set')}</div>
+          <div class="ba">📍 ${esc(b.location || b.address || 'Address not set')}</div>
         </div>
       </div>
       <div class="bc-mid">
@@ -539,12 +581,20 @@ async function confirmJoin() {
   const r = await joinQueue(pendingBiz.id, customerName, svc);
   btn.disabled=false; btn.innerHTML='Join Queue';
   if(!r.ok) return toast('e','Failed to join',r.err);
-  myToken = { tokenNum: r.token, bizId: pendingBiz.id, bizName: pendingBiz.name, service: svc, joinedAt: new Date(), lastAlertPos: -99 };
+  myToken = {
+    tokenNum: r.token,
+    tokenId: r.tokenId || null,
+    bizId: pendingBiz.id,
+    bizName: pendingBiz.name,
+    service: svc,
+    joinedAt: new Date(),
+    lastAlertPos: -99,
+  };
   cm('mo-join');
   toast('s',`Queue Joined! 🎫`,`Token #${r.token} — ${pendingBiz.name}`);
   addNotif('🎫','Queue Joined',`Token #${r.token} at ${pendingBiz.name}. Service: ${svc}`,'s');
   document.getElementById('u-tokbadge').style.display='inline';
-  qHistory.unshift({business:pendingBiz.name, service:svc, token:r.token, date:new Date().toLocaleDateString('en-IN'), time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), status:'Waiting'});
+  await loadQueueHistory();
   renderHistory();
   renderTokenCard();
   refreshMyQueue();
@@ -585,6 +635,7 @@ function renderTokenCard() {
 
 async function refreshMyQueue() {
   if(!myToken) return;
+  await loadQueueHistory();
   const q = await getQueue(myToken.bizId);
 
   // Find this customer's token in the queue
@@ -592,7 +643,11 @@ async function refreshMyQueue() {
 
   // Check if admin updated the status of this customer's token
   const myEntry = q.find(t=>String(t.token_number)===String(myToken.tokenNum));
-  const adminStatus = myEntry ? myEntry.status : (pos === -1 ? 'completed' : 'waiting');
+  let adminStatus = myEntry ? myEntry.status : (pos === -1 ? 'completed' : 'waiting');
+  const histEntry = qHistory.find(h=>h.token===myToken.tokenNum && h.business===myToken.bizName);
+  if (histEntry?.status) {
+    adminStatus = String(histEntry.status).toLowerCase();
+  }
 
   // Sync admin status change → customer history (only once per status change)
   if (adminStatus !== myToken.lastAdminStatus) {
@@ -616,6 +671,19 @@ async function refreshMyQueue() {
       clearInterval(pollId);
       document.getElementById('u-tokbadge').style.display='none';
       document.getElementById('u-tokcontent').innerHTML='<div class="card"><div class="card-bd"><div class="es"><span class="ei">✅</span><p><strong>Visit completed!</strong><br>Thank you. Your visit has been marked complete by the business.</p><button class="btn btn-primary" style="margin-top:14px" onclick="ut(\'browse\',null)">Browse Services</button></div></div></div>';
+      updateHomeStats(null);
+      return;
+    }
+    if (adminStatus === 'cancelled') {
+      const h = qHistory.find(h=>h.token===myToken.tokenNum && h.business===myToken.bizName);
+      if (h) h.status = 'Cancelled';
+      renderHistory();
+      addNotif('🚫','Visit Cancelled',`Your token at ${myToken.bizName} has been cancelled.`,'w');
+      toast('w','🚫 Token Cancelled',`Queue entry at ${myToken.bizName} was cancelled.`);
+      myToken = null;
+      clearInterval(pollId);
+      document.getElementById('u-tokbadge').style.display='none';
+      document.getElementById('u-tokcontent').innerHTML='<div class="card"><div class="card-bd"><div class="es"><span class="ei">🚫</span><p><strong>Token cancelled.</strong><br>Your queue request is no longer active.</p><button class="btn btn-primary" style="margin-top:14px" onclick="ut(\'browse\',null)">Browse Services</button></div></div></div>';
       updateHomeStats(null);
       return;
     }
@@ -702,21 +770,28 @@ function updateHomeStats(q) {
 
 function cancelToken() {
   if(!myToken) return;
-  const old=myToken; myToken=null;
-  clearInterval(pollId);
-  // Remove from demo queue
-  const q=demoQueues[old.bizId]||[];
-  const idx=q.findIndex(t=>String(t.token_number)===String(old.tokenNum));
-  if(idx>-1) q.splice(idx,1);
-  // Update history
-  const h=qHistory.find(h=>h.token===old.tokenNum&&h.business===old.bizName);
-  if(h) h.status='Cancelled';
-  document.getElementById('u-tokcontent').innerHTML='<div class="card"><div class="card-bd"><div class="es"><span class="ei">🎫</span><p><strong>No token yet.</strong><br>Browse services to join a queue.</p><button class="btn btn-primary" style="margin-top:14px" onclick="ut(\'browse\',null)">Browse Services</button></div></div></div>';
-  document.getElementById('u-tokbadge').style.display='none';
-  addNotif('🚫','Token Cancelled',`Token #${old.tokenNum} at ${old.bizName} cancelled.`,'w');
-  toast('i','Token Cancelled',`You've left the queue at ${old.bizName}.`);
-  updateHomeStats(null);
-  renderHistory();
+  const old=myToken;
+  api('POST', '/queue/cancel', {
+    token_id: old.tokenId,
+    token_number: old.tokenNum,
+    business_id: old.bizId,
+  }).then(async (resp) => {
+    if (!resp.ok && !resp.offline) {
+      toast('e','Cancel failed', resp.err || 'Could not cancel token.');
+      return;
+    }
+    myToken = null;
+    clearInterval(pollId);
+    const h=qHistory.find(h=>h.token===old.tokenNum&&h.business===old.bizName);
+    if(h) h.status='Cancelled';
+    await loadQueueHistory();
+    document.getElementById('u-tokcontent').innerHTML='<div class="card"><div class="card-bd"><div class="es"><span class="ei">🎫</span><p><strong>No token yet.</strong><br>Browse services to join a queue.</p><button class="btn btn-primary" style="margin-top:14px" onclick="ut(\'browse\',null)">Browse Services</button></div></div></div>';
+    document.getElementById('u-tokbadge').style.display='none';
+    addNotif('🚫','Token Cancelled',`Token #${old.tokenNum} at ${old.bizName} cancelled.`,'w');
+    toast('i','Token Cancelled',`You've left the queue at ${old.bizName}.`);
+    updateHomeStats(null);
+    renderHistory();
+  });
 }
 
 function startPoll() {
@@ -757,11 +832,7 @@ function clearNotifs(){ notifs=[]; renderNotifs(); markRead(); toast('i','Notifi
 function renderHistory(){
   const tb=document.getElementById('u-histbody');
   if(!tb) return;
-  const allH=[...qHistory,
-    {business:'Sunrise Clinic',service:'General Consultation',token:21,date:'12/03/2026',time:'10:30 AM',status:'Completed'},
-    {business:'City Salon',service:'Haircut',token:8,date:'10/03/2026',time:'3:15 PM',status:'Completed'},
-    {business:'QuickCuts',service:'Beard Trim',token:14,date:'05/03/2026',time:'11:00 AM',status:'Cancelled'},
-  ];
+  const allH=[...qHistory];
   if(!allH.length){tb.innerHTML='<tr><td colspan="5"><div class="es"><span class="ei">📋</span><p>No history yet.</p></div></td></tr>';return;}
   const map={'Completed':'bg-green','Waiting':'bg-warn','Serving':'bg-blue','Cancelled':'bg-red'};
   tb.innerHTML=allH.map(h=>`<tr>
@@ -1505,7 +1576,7 @@ async function callNext(){
   if(socket) socket.emit('queue_called',{business_id:bizId,token:r.served});
 }
 
-async function completeTokenAction(id, bizId, doneMsg){
+async function completeTokenAction(id, bizId, doneMsg, targetStatus){
   let tokenNumber = '--';
   try {
     const q = await getQueue(bizId);
@@ -1516,17 +1587,17 @@ async function completeTokenAction(id, bizId, doneMsg){
   const resp = await api('POST', '/queue/update-status', {
     token_id: id,
     business_id: bizId,
-    status: 'completed'
+    status: targetStatus
   });
 
   // Demo fallback when backend update is unavailable.
   if (!resp.ok) {
     const q = demoQueues[bizId] || [];
     const idx = q.findIndex(t => String(t.id) === String(id));
-    if (idx > -1) q.splice(idx, 1);
+    if (idx > -1) q[idx].status = targetStatus;
   }
 
-  const isRemoved = doneMsg.includes('removed');
+  const isRemoved = targetStatus === 'cancelled';
   const action = isRemoved ? 'Removed' : 'Skipped';
   addAdminHist(bizId, tokenNumber, isRemoved ? 'removed' : 'skipped', action, '0 min');
 
@@ -1534,15 +1605,15 @@ async function completeTokenAction(id, bizId, doneMsg){
   loadQMQ();
   aRefresh();
   renderAdminHist();
-  if (socket) socket.emit('queue_update', { business_id: bizId, token_id: id, status: 'completed' });
+  if (socket) socket.emit('queue_update', { business_id: bizId, token_id: id, status: targetStatus });
 }
 
 function skipTok(id,bizId){
-  completeTokenAction(id, bizId, 'Token skipped.');
+  completeTokenAction(id, bizId, 'Token skipped.', 'completed');
 }
 
 function removeTok(id,bizId){
-  completeTokenAction(id, bizId, 'Customer removed from queue.');
+  completeTokenAction(id, bizId, 'Customer removed from queue.', 'cancelled');
 }
 
 function moveTokUp(id,bizId){
@@ -1662,11 +1733,14 @@ async function createBusiness(){
   if(!name||!loc) return toast('w','Name and address required.');
   const btn=document.getElementById('ab-btn');
   btn.disabled=true; btn.innerHTML='<span class="sp"></span>';
-  await doCreateBiz(name,type,loc,hrs);
+  const res = await doCreateBiz(name,type,loc,hrs);
   btn.disabled=false; btn.innerHTML='Create Business';
+  if (!res.ok) return toast('e','Create failed', res.err || 'Please try again.');
   toast('s','Business created!',name);
   cm('mo-addbiz');
+  await getBiz();
   loadBizTable(); fillAdminSelects(); aRefresh();
+  if (document.getElementById('page-user').classList.contains('active')) loadBizGrid();
 }
 
 async function createBusiness2(){
@@ -1677,12 +1751,15 @@ async function createBusiness2(){
   if(!name||!loc) return toast('w','Name and address required.');
   const btn=document.getElementById('ab2-btn');
   btn.disabled=true; btn.innerHTML='<span class="sp"></span> Creating…';
-  await doCreateBiz(name,type,loc,hrs);
+  const res = await doCreateBiz(name,type,loc,hrs);
   btn.disabled=false; btn.innerHTML='Create Business';
+  if (!res.ok) return toast('e','Create failed', res.err || 'Please try again.');
   toast('s','Business created!',name);
   document.getElementById('ab2-name').value='';
   document.getElementById('ab2-loc').value='';
+  await getBiz();
   loadBizTable(); fillAdminSelects(); aRefresh();
+  if (document.getElementById('page-user').classList.contains('active')) loadBizGrid();
 }
 
 async function deleteBiz(bizId, bizName) {
@@ -2036,10 +2113,21 @@ function renderFaqList() {
 function renderAdminFaqList() {
   const el = document.getElementById('a-faqlist');
   if (!el) return;
+
+  const active = document.activeElement;
+  const activeId = active?.id || null;
+  const activeStart = typeof active?.selectionStart === 'number' ? active.selectionStart : null;
+  const activeEnd = typeof active?.selectionEnd === 'number' ? active.selectionEnd : null;
+
   if (!faqStore.length) {
     el.innerHTML = '<div class="es"><span class="ei">💬</span><p>No questions from customers yet.</p></div>';
     return;
   }
+
+  faqStore.forEach((f) => {
+    if (f.answer) delete faqAnswerDraft[f.id];
+  });
+
   el.innerHTML = faqStore.map(f => `
     <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;background:var(--card)">
       <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">
@@ -2055,16 +2143,26 @@ function renderAdminFaqList() {
             <strong>Your answer:</strong> ${esc(f.answer)}
           </div>`
         : `<div style="display:flex;gap:8px;align-items:flex-end">
-            <div class="fg" style="margin:0;flex:1"><input class="fi" id="faq-ans-${f.id}" placeholder="Type your answer…" onkeydown="if(event.key==='Enter')answerFaq('${f.id}')"/></div>
+            <div class="fg" style="margin:0;flex:1"><input class="fi" id="faq-ans-${f.id}" value="${esc(faqAnswerDraft[f.id] || '')}" placeholder="Type your answer…" oninput="faqAnswerDraft['${f.id}']=this.value" onkeydown="if(event.key==='Enter')answerFaq('${f.id}')"/></div>
             <button class="btn btn-primary btn-sm" onclick="answerFaq('${f.id}')">✅ Reply</button>
           </div>`
       }
     </div>`).join('');
+
+  if (activeId && activeId.startsWith('faq-ans-')) {
+    const next = document.getElementById(activeId);
+    if (next) {
+      next.focus();
+      if (activeStart !== null && activeEnd !== null) {
+        next.setSelectionRange(activeStart, activeEnd);
+      }
+    }
+  }
 }
 
 async function answerFaq(id) {
   const inp = document.getElementById('faq-ans-'+id);
-  const ans = (inp?.value || '').trim();
+  const ans = String(faqAnswerDraft[id] || inp?.value || '').trim();
   if (!ans) { toast('w', 'Please type an answer.'); return; }
   const r = await api('POST', `/faq/${id}/answer`, { answer: ans });
   let entry = faqStore.find(f => String(f.id) === String(id));
@@ -2082,6 +2180,7 @@ async function answerFaq(id) {
     if (socket) socket.emit('faq_answered', entry);
   }
   toast('s', '✅ Answer Sent', 'Customer will see your response.');
+  delete faqAnswerDraft[id];
   updateFaqBadges();
   // Show badge on customer side
   const ub = document.getElementById('u-faqbadge');
@@ -2092,12 +2191,25 @@ async function answerFaq(id) {
 
 
 
-(function init(){
+(async function init(){
   applyTheme();
   try {
     const su=ls('ql_user'), st=ls('ql_tok');
     if(su&&st){
-      user=JSON.parse(su);
+      const me = await api('GET', '/auth/me');
+      if (!me.ok || !me.data?.user) {
+        throw new Error('Invalid session');
+      }
+
+      const account = me.data.user;
+      user = {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        phone: '',
+        role: account.role,
+      };
+      ls('ql_user', JSON.stringify(user));
       initSocket();
       if(user.role==='admin') sp('page-admin');
       else sp('page-user');
