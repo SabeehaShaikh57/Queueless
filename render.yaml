@@ -21,6 +21,8 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
       - key: ADMIN_NAME
         value: QueueLess Admin
       - key: ADMIN_EMAIL

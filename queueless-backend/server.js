@@ -25,10 +25,29 @@ const configuredOrigins = String(process.env.CORS_ORIGIN || "")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const configuredOriginRegex = String(process.env.CORS_ORIGIN_REGEX || "").trim();
+let originRegex = null;
+
+if (configuredOriginRegex) {
+    try {
+        originRegex = new RegExp(configuredOriginRegex);
+    } catch (error) {
+        console.error("Invalid CORS_ORIGIN_REGEX pattern", error.message || error);
+    }
+}
+
 const isAllowedOrigin = (origin) => {
     if (!origin) return true;
-    if (configuredOrigins.length === 0) return true;
-    return configuredOrigins.includes(origin);
+
+    if (configuredOrigins.includes(origin)) {
+        return true;
+    }
+
+    if (originRegex && originRegex.test(origin)) {
+        return true;
+    }
+
+    return configuredOrigins.length === 0 && !originRegex;
 };
 
 const corsConfig = {

@@ -167,6 +167,8 @@ All Vercel frontend env vars are listed in [queueless-frontend/.env.vercel.examp
 Backend CORS reminder:
 
 - In your backend host, set `CORS_ORIGIN` to your Vercel domain, for example `https://your-app.vercel.app`.
+- Optional for Vercel preview deployments, set `CORS_ORIGIN_REGEX` to allow preview URLs, for example:
+  - `^https:\/\/[a-z0-9-]+\.vercel\.app$`
 
 ---
 
