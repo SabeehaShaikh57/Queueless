@@ -1,11 +1,13 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 
 const http = require("http");
 const { Server } = require("socket.io");
 
-const db = require("./config/db");
+const { mongoose, connectDB } = require("./config/db");
 const { seedAdminFromEnv } = require("./utils/seedAdmin");
 const { seedBusinessesFromJson } = require("./utils/seedBusinesses");
 
@@ -17,11 +19,44 @@ const faqRoutes = require("./routes/faqRoutes");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+const configuredOrigins = String(process.env.CORS_ORIGIN || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (configuredOrigins.length === 0) return true;
+    return configuredOrigins.includes(origin);
+};
+
+const corsConfig = {
+    origin(origin, callback) {
+        if (isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error("CORS origin not allowed"));
+    },
+    credentials: true,
+};
+
+const io = new Server(server, { cors: corsConfig });
 app.set("io", io);
 
-app.use(cors());
+app.disable("x-powered-by");
+app.use(cors(corsConfig));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const frontendDir = path.resolve(__dirname, "../queueless-frontend");
+const frontendIndex = path.join(frontendDir, "index.html");
+const requestedFrontendServe = String(process.env.SERVE_FRONTEND || "true").toLowerCase() !== "false";
+const serveFrontend = requestedFrontendServe && fs.existsSync(frontendIndex);
+
+if (serveFrontend) {
+    app.use(express.static(frontendDir));
+}
 
 app.use("/api/auth", authRoutes);
 app.use("/api/business", businessRoutes);
@@ -37,8 +72,20 @@ seedBusinessesFromJson().catch((error) => {
     console.error("Businesses seed failed", error);
 });
 
+app.get("/api/health", (req, res) => {
+    res.json({
+        status: "ok",
+        uptime: Math.round(process.uptime()),
+        timestamp: new Date().toISOString(),
+        dbState: mongoose.connection.readyState,
+    });
+});
+
 app.get("/", (req,res)=>{
-    res.send("QueueLess Backend Running");
+    if (serveFrontend) {
+        return res.sendFile(frontendIndex);
+    }
+    return res.send("QueueLess Backend Running");
 });
 
 io.on("connection",(socket)=>{
@@ -96,6 +143,28 @@ io.on("connection",(socket)=>{
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, ()=>{
-    console.log("Server running on port " + PORT);
-});
+async function start() {
+    if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+        console.error("JWT_SECRET is required in production");
+        process.exit(1);
+    }
+
+    await connectDB();
+    server.listen(PORT, () => {
+        console.log("Server running on port " + PORT);
+    });
+}
+
+start();
+
+function shutdown(signal) {
+    console.log(`${signal} received. Shutting down server...`);
+    server.close(() => {
+        mongoose.connection.close(false).finally(() => {
+            process.exit(0);
+        });
+    });
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

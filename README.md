@@ -45,6 +45,131 @@ ql_v5/
 
 ---
 
+## 🌍 Deployment Ready Setup
+
+The project is now structured to run in production with environment-based settings.
+
+### 1) Backend environment file
+
+Copy `queueless-backend/.env.example` to `queueless-backend/.env` and set:
+
+- `MONGODB_URI` (MongoDB Atlas or hosted MongoDB)
+- `JWT_SECRET` (strong random secret)
+- `CORS_ORIGIN` (comma-separated frontend origins)
+- `ADMIN_EMAIL` + `ADMIN_PASSWORD` (optional first-run admin seed)
+
+### 2) Production behavior included
+
+- Health endpoint: `GET /api/health`
+- CORS allowlist from `CORS_ORIGIN`
+- Graceful shutdown for process managers/container platforms
+- Frontend can be served by backend when `SERVE_FRONTEND=true`
+- Frontend API/socket defaults to same-origin in production
+
+### 3) Deploy options
+
+#### Option 0 — One-command full stack (recommended quick deploy)
+
+From project root:
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+```
+
+App URL: `http://localhost:5000`  
+Health check: `http://localhost:5000/api/health`
+
+#### Option A — Single service (Backend + static frontend)
+
+Deploy backend folder, keep `SERVE_FRONTEND=true`, and ensure `queueless-frontend` is available alongside backend files in your deployment artifact.
+
+#### Option B — Split services
+
+- Deploy backend (`queueless-backend`) as API service.
+- Deploy frontend (`queueless-frontend`) as static site.
+- Set browser override if needed:
+  - `localStorage.setItem('ql_api_base', 'https://your-api-domain/api')`
+
+#### Option C — Docker
+
+From `queueless-backend`:
+
+```bash
+docker build -t queueless-backend .
+docker run -p 5000:5000 --env-file .env queueless-backend
+```
+
+Stop root compose deployment:
+
+```bash
+docker compose down
+```
+
+#### Option D - Render (GitHub auto-deploy)
+
+This repo includes [render.yaml](render.yaml). Deploy steps:
+
+1. Push changes to GitHub.
+2. In Render, create a new Blueprint instance from your repo.
+3. Set secret env vars in Render service settings:
+  - `JWT_SECRET`
+  - `MONGODB_URI` (MongoDB Atlas URI recommended)
+  - `CORS_ORIGIN` (your Render app URL, e.g. `https://your-app.onrender.com`)
+  - `ADMIN_EMAIL` and `ADMIN_PASSWORD` (optional admin seed)
+4. Deploy. Render uses:
+  - Build: `cd queueless-backend && npm ci --omit=dev`
+  - Start: `cd queueless-backend && npm start`
+  - Health: `/api/health`
+
+Use [env.render.example](env.render.example) as a copy-paste variable template.
+
+#### Option E - Railway (GitHub deploy)
+
+This repo includes [railway.json](railway.json). Deploy steps:
+
+1. Create a new Railway project from this GitHub repo.
+2. Add variables in Railway project settings:
+  - `NODE_ENV=production`
+  - `SERVE_FRONTEND=true`
+  - `JWT_SECRET`
+  - `MONGODB_URI`
+  - `CORS_ORIGIN` (your Railway public URL)
+  - `ADMIN_EMAIL` and `ADMIN_PASSWORD` (optional)
+3. Railway runs:
+  - Build: `cd queueless-backend && npm ci --omit=dev`
+  - Start: `cd queueless-backend && npm start`
+4. Verify after deploy:
+  - App URL root should load frontend
+  - `/api/health` should return status JSON
+
+Use [env.railway.example](env.railway.example) as a copy-paste variable template.
+
+Deployment checklist: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
+
+#### Option F - Vercel (Frontend) + Render/Railway (Backend)
+
+Use Vercel for frontend static hosting and keep backend on Render or Railway.
+
+Vercel frontend setup:
+
+1. Import repo into Vercel.
+2. Set **Root Directory** to `queueless-frontend`.
+3. Vercel will use [queueless-frontend/vercel.json](queueless-frontend/vercel.json) to run build command:
+  - `node scripts/generate-runtime-config.js`
+4. Add frontend env vars in Vercel (Project Settings -> Environment Variables):
+  - `QL_API_BASE` (required): full API URL ending with `/api`
+  - `QL_SOCKET_BASE` (required): backend origin URL (no `/api`)
+5. Deploy.
+
+All Vercel frontend env vars are listed in [queueless-frontend/.env.vercel.example](queueless-frontend/.env.vercel.example).
+
+Backend CORS reminder:
+
+- In your backend host, set `CORS_ORIGIN` to your Vercel domain, for example `https://your-app.vercel.app`.
+
+---
+
 ## 🚀 How to Use
 
 ### Option 1 — Demo Mode (No Backend Required)
@@ -328,11 +453,19 @@ Open source / Educational use
 
 ## ⚙️ Configuration
 
-To change the backend URL, edit line 4 in `js/app.js`:
+Backend and Socket URLs auto-resolve from current origin in production.
+
+Manual API override (optional):
+
 ```js
-const API = 'http://localhost:5000/api';
+localStorage.setItem('ql_api_base', 'https://your-api-domain/api');
 ```
-Replace with your server URL when deploying.
+
+Remove override:
+
+```js
+localStorage.removeItem('ql_api_base');
+```
 
 ---
 

@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: queueless-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: queueless-app
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/queueless
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5000}
+      ADMIN_NAME: ${ADMIN_NAME:-QueueLess Admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      SERVE_FRONTEND: "true"
+
+volumes:
+  mongo_data:

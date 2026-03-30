@@ -51,12 +51,28 @@
 // STATE
 // ═══════════════════════════════════════════
 const API = (() => {
+  const runtimeBase = typeof window !== 'undefined' ? window.__QL_API_BASE__ : '';
+  if (runtimeBase) return String(runtimeBase).replace(/\/+$/, '');
+
   const saved = localStorage.getItem('ql_api_base');
   if (saved) return saved.replace(/\/+$/, '');
+
   if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-    return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+    return `${window.location.origin}/api`;
   }
+
   return 'http://localhost:5000/api';
+})();
+
+const SOCKET_BASE = (() => {
+  const runtimeSocket = typeof window !== 'undefined' ? window.__QL_SOCKET_BASE__ : '';
+  if (runtimeSocket) return String(runtimeSocket).replace(/\/+$/, '');
+
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    return window.location.origin;
+  }
+
+  return 'http://localhost:5000';
 })();
 let user = null, loginRole = 'customer', myToken = null;
 let bizList = [], qHistory = [], notifs = [], svcs = [];
@@ -367,10 +383,7 @@ function logout() {
 function initSocket() {
   try {
     if (typeof io === 'undefined') return;
-    const socketBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
-      ? `${window.location.protocol}//${window.location.hostname}:5000`
-      : 'http://localhost:5000';
-    socket = io(socketBase,{transports:['websocket','polling'],timeout:3000});
+    socket = io(SOCKET_BASE,{transports:['websocket','polling'],timeout:3000});
     socket.on('connect',()=>console.log('🔌 Socket connected'));
     socket.on('queue_update',d=>{
       if(myToken && String(d.business_id)===String(myToken.bizId)) refreshMyQueue();
